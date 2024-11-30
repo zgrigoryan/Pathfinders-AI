@@ -39,4 +39,7 @@ ERASER_TEXT_Y = 130
 PLAYER_Y = 190
 PLAYER_TEXT_Y = 200
 
+WIFEY_Y = 260
+WIFEY_TEXT_Y = 270
+
 # ________________________________________
