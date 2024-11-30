@@ -4,8 +4,8 @@ import sys
 from pygame import Rect
 
 import custom_constants as c
-from typing import List, Tuple
-from utils import ask_input
+# from typing import List, Tuple
+# from utils import ask_input
 
 
 class Grid:
@@ -33,7 +33,6 @@ class Grid:
         for y in range(self.grid_size):
             for x in range(self.grid_size):
                 rect = pygame.Rect(x * self.cell_size, y * self.cell_size, self.cell_size, self.cell_size)
-                color = c.WHITE  # Default color for empty cell
 
                 if self.grid[y][x] == c.WALL_ID:
                     screen.blit(self.wall_image, rect.topleft)
@@ -72,7 +71,6 @@ class Sidebar:
         Draws a sidebar with "Wall" and "Eraser" buttons on the screen.
 
         :param screen: pygame screen surface
-        :param selected_tool: currently selected tool ("wall" or "eraser")
         :return: wall_button and eraser_button as Rect objects for collision detection
         """
 
