@@ -14,6 +14,7 @@ KID1_ID = 3
 KID2_ID = 4
 WIFEY_ID = 5
 LAVA_ID = 6
+MOUNTAIN_ID = 7
 
 # COLORS _________________________________
 
@@ -46,6 +47,9 @@ WIFEY_TEXT_Y = 270
 
 LAVA_Y = 330
 LAVA_TEXT_Y = 340
+
+MOUNTAIN_Y = 400
+MOUNTAIN_TEXT_Y = 410
 
 SLIDER_Y = WINDOW_SIZE - 100
 
