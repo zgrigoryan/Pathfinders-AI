@@ -4,7 +4,7 @@
 
 WINDOW_SIZE = 600
 SIDEBAR_WIDTH = 100
-PYGAME_FONT = 30
+PYGAME_FONT = 27
 GRID_WIDTH = 1
 
 EMPTY_CELL_ID = 0
@@ -22,6 +22,7 @@ DARK_GREY = (100, 100, 100)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
+GREEN = (0, 255, 0)
 
 # SIDEBAR ________________________________
 
@@ -41,5 +42,7 @@ PLAYER_TEXT_Y = 200
 
 WIFEY_Y = 260
 WIFEY_TEXT_Y = 270
+
+SLIDER_Y = WINDOW_SIZE - 100
 
 # ________________________________________

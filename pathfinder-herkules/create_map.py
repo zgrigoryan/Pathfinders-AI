@@ -4,7 +4,7 @@ import sys
 from pygame import Rect
 
 import custom_constants as c
-# from typing import List, Tuple
+from typing import List
 # from utils import ask_input
 
 
@@ -65,8 +65,9 @@ class Grid:
 class Sidebar:
     def __init__(self):
         self.selected_tool = "wall"
+        self.check_map = False
 
-    def draw(self, screen: pygame.Surface) -> tuple[Rect, Rect, Rect, Rect]:
+    def draw(self, screen: pygame.Surface) -> List[Rect]:
         """
         Draws a sidebar with "Wall" and "Eraser" buttons on the screen.
 
@@ -108,7 +109,22 @@ class Sidebar:
         wifey_text = font.render("Wifey", True, c.WHITE)  # antialiasing -> making the text smoother
         screen.blit(wifey_text, (c.BUTTON_TEXT_X, c.WIFEY_TEXT_Y))  # Position text on the button
 
-        return wall_button, eraser_button, player_button, wifey_button
+        # Draw "Check Map" slider
+        slider_rect = pygame.Rect(c.BUTTON_X, c.SLIDER_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
+        pygame.draw.rect(screen, c.DARK_GREY, slider_rect, border_radius=20)
+        circle_x = c.BUTTON_X + 20 if not self.check_map else c.BUTTON_X + c.BUTTON_WIDTH - 20
+        circle_y = c.SLIDER_Y + c.BUTTON_HEIGHT // 2
+        circle_color = c.WHITE if not self.check_map else c.GREEN
+        pygame.draw.circle(screen, circle_color, (circle_x, circle_y), c.BUTTON_WIDTH // 4)
+        slider_text = font.render("Check Map", True, c.BLACK)
+        screen.blit(slider_text, (c.BUTTON_X - 10, c.SLIDER_Y - 20))
+
+        button_list = [wall_button, eraser_button, player_button, wifey_button, slider_rect]
+
+        return button_list
+
+    def toggle_check_map(self) -> None:
+        self.check_map = not self.check_map  # Toggle the state
 
     def select_tool(self, tool: str) -> None:
         self.selected_tool = tool
@@ -134,7 +150,7 @@ class Game:
 
             # Draw the grid and sidebar
             self.grid.draw(self.screen)
-            wall_button, eraser_button, player_button, wifey_button = self.sidebar.draw(self.screen)
+            wall_button, eraser_button, player_button, wifey_button, slider_rect = self.sidebar.draw(self.screen)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -152,6 +168,9 @@ class Game:
                         self.sidebar.select_tool("player")
                     elif wifey_button.collidepoint(mouse_x, mouse_y):  # If click on "Wifey" button
                         self.sidebar.select_tool("wifey")
+                    elif slider_rect.collidepoint(mouse_x, mouse_y):  # If "Check Map" button is clicked
+                        self.sidebar.toggle_check_map()
+
                 elif event.type == pygame.MOUSEBUTTONUP:
                     self.mouse_held = False
 
