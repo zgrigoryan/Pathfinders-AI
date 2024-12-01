@@ -4,6 +4,7 @@ from pygame import Rect
 import custom_constants as c
 from typing import List, Tuple
 from collections import deque
+import time
 #from utils import ask_input
 
 class Grid:
@@ -158,18 +159,135 @@ class Grid:
 
         self.update_violating_cells()
 
+    def bfs(self, start, goal):
+        """
+        Perform BFS search from start to goal.
+        :param start: (x, y) tuple
+        :param goal: (x, y) tuple
+        :return: path, runtime
+        """
+        from collections import deque
+        start_time = time.perf_counter()
+        queue = deque()
+        queue.append((start, [start]))
+        visited = set()
+        visited.add(start)
+        while queue:
+            (x, y), path = queue.popleft()
+            if (x, y) == goal:
+                runtime = time.perf_counter() - start_time
+                return path, runtime
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
+                    if (nx, ny) not in visited and self.grid[ny][nx] != c.WALL_ID:
+                        visited.add((nx, ny))
+                        queue.append(((nx, ny), path + [(nx, ny)]))
+        runtime = time.perf_counter() - start_time
+        return None, runtime  # No path found
+
+    def dfs(self, start, goal):
+        """
+        Perform DFS search from start to goal.
+        :param start: (x, y) tuple
+        :param goal: (x, y) tuple
+        :return: path, runtime
+        """
+        start_time = time.perf_counter()
+        stack = [(start, [start])]
+        visited = set()
+        visited.add(start)
+        while stack:
+            (x, y), path = stack.pop()
+            if (x, y) == goal:
+                runtime = time.perf_counter() - start_time
+                return path, runtime
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
+                    if (nx, ny) not in visited and self.grid[ny][nx] != c.WALL_ID:
+                        visited.add((nx, ny))
+                        stack.append(((nx, ny), path + [(nx, ny)]))
+        runtime = time.perf_counter() - start_time
+        return None, runtime  # No path found
+
+    def ucs(self, start, goal):
+        """
+        Perform Uniform Cost Search from start to goal.
+        :param start: (x, y) tuple
+        :param goal: (x, y) tuple
+        :return: path, runtime
+        """
+        import heapq
+        start_time = time.perf_counter()
+        heap = []
+        heapq.heappush(heap, (0, start, [start]))
+        visited = {start: 0}
+        while heap:
+            cost, (x, y), path = heapq.heappop(heap)
+            if (x, y) == goal:
+                runtime = time.perf_counter() - start_time
+                return path, runtime
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
+                    cell_id = self.grid[ny][nx]
+                    cell_cost = c.CELL_COSTS.get(cell_id, 1)
+                    if cell_cost == float('inf'):
+                        continue  # Skip impassable cells
+                    new_cost = cost + cell_cost
+                    if (nx, ny) not in visited or new_cost < visited[(nx, ny)]:
+                        visited[(nx, ny)] = new_cost
+                        heapq.heappush(heap, (new_cost, (nx, ny), path + [(nx, ny)]))
+        runtime = time.perf_counter() - start_time
+        return None, runtime  # No path found
+
+    def astar(self, start, goal):
+        """
+        Perform A* Search from start to goal using Manhattan distance heuristic.
+        :param start: (x, y) tuple
+        :param goal: (x, y) tuple
+        :return: path, runtime
+        """
+        import heapq
+        start_time = time.perf_counter()
+        heap = []
+        h = lambda x, y: abs(x - goal[0]) + abs(y - goal[1])
+        heapq.heappush(heap, (h(*start), 0, start, [start]))
+        visited = {start: 0}
+        while heap:
+            estimated_total_cost, cost_so_far, (x, y), path = heapq.heappop(heap)
+            if (x, y) == goal:
+                runtime = time.perf_counter() - start_time
+                return path, runtime
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
+                    cell_id = self.grid[ny][nx]
+                    cell_cost = c.CELL_COSTS.get(cell_id, 1)
+                    if cell_cost == float('inf'):
+                        continue  # Skip impassable cells
+                    new_cost_so_far = cost_so_far + cell_cost
+                    if (nx, ny) not in visited or new_cost_so_far < visited[(nx, ny)]:
+                        visited[(nx, ny)] = new_cost_so_far
+                        estimated_total_cost = new_cost_so_far + h(nx, ny)
+                        heapq.heappush(heap, (estimated_total_cost, new_cost_so_far, (nx, ny), path + [(nx, ny)]))
+        runtime = time.perf_counter() - start_time
+        return None, runtime  # No path found
+
 
 class Sidebar:
     def __init__(self):
         self.selected_tool = "wall"
         self.check_map = False
 
-    def draw(self, screen: pygame.Surface, valid_map: bool) -> Tuple[List[Rect], Rect, Rect]:
+    def draw(self, screen: pygame.Surface, valid_map: bool, search_results=None) -> Tuple[List[Rect], Rect, Rect]:
         """
         Draws a sidebar with tool buttons and a "Check Map" slider.
 
         :param screen: pygame screen surface
         :param valid_map: whether the current map is valid
+        :param search_results: dictionary of search algorithm runtimes
         :return: wall_button and eraser_button as Rect objects for collision detection
         """
         font = pygame.font.Font(None, c.PYGAME_FONT)  # Set font for button labels
@@ -195,7 +313,7 @@ class Sidebar:
             current_y += c.BUTTON_HEIGHT + c.BUTTON_SPACING
 
         # Draw "Check Map" slider
-        slider_rect = self.draw_slider(screen, font, current_y, valid_map)
+        slider_rect = self.draw_slider(screen, font, valid_map)
         current_y += c.BUTTON_SPACING + c.BUTTON_HEIGHT  # Move y-position below the slider
 
         # Draw "RUN" button always, but change its appearance based on validity
@@ -218,16 +336,23 @@ class Sidebar:
         if self.check_map and valid_map:
             pygame.draw.rect(screen, c.GREEN, run_button_rect, 2, border_radius=5)
 
-        # Return tool buttons, slider_rect, and run_button_rect
+        if search_results:
+            result_font = pygame.font.Font(None, c.RESULT_FONT_SIZE)
+            for alg_name, runtime in search_results.items():
+                result_text = f"{alg_name}: {runtime * 1000:.2f} ms"
+                result_surface = result_font.render(result_text, True, c.BLACK)
+                text_x = c.BUTTON_X
+                screen.blit(result_surface, (text_x, current_y))
+                current_y += result_surface.get_height() + 5  # Adjust spacing as needed
+
         return tool_buttons, slider_rect, run_button_rect
 
-    def draw_slider(self, screen: pygame.Surface, font: pygame.font.Font, current_y: int, valid_map: bool) -> Rect:
+    def draw_slider(self, screen: pygame.Surface, font: pygame.font.Font, valid_map: bool) -> Rect:
         """
         Draws the "Check Map" slider below the tool buttons.
 
         :param screen: pygame screen surface
         :param font: pygame font object
-        :param current_y: current y-position after the last button
         :param valid_map: whether the current map is valid
         :return: slider Rect for collision detection
         """
@@ -263,6 +388,8 @@ class Sidebar:
 
 class Game:
     def __init__(self):
+        self.search_paths = None
+        self.search_results = None
         pygame.init()
         self.grid_size = 10
 
@@ -283,8 +410,14 @@ class Game:
             # Draw the grid
             self.grid.draw(self.screen, self.sidebar.check_map)
 
-            # Draw the sidebar and get tool buttons and slider
-            tool_buttons, slider, run_button = self.sidebar.draw(self.screen, self.grid.valid_map)
+            # Draw the sidebar and get tool buttons, slider_rect, and run_button_rect
+            if hasattr(self, 'search_results'):
+                tool_buttons, slider, run_button = self.sidebar.draw(self.screen,
+                                                                     self.grid.valid_map,
+                                                                     self.search_results)
+            else:
+                tool_buttons, slider, run_button = self.sidebar.draw(self.screen,
+                                                                     self.grid.valid_map)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -332,10 +465,57 @@ class Game:
     def run_game(self):
         """
         Action to perform when the RUN button is clicked.
-        Replace this method's content with the actual game logic.
+        Runs BFS, DFS, UCS, and A* algorithms and measures their runtimes.
         """
         print("RUN button clicked! Starting the game...")
-        # TODO: Implement the actual RUN logic here
+
+        # Get the player and goal positions
+        player_pos = None
+        goal_pos = None
+        for y in range(self.grid.grid_size):
+            for x in range(self.grid.grid_size):
+                if self.grid.grid[y][x] == c.PLAYER_ID:
+                    player_pos = (x, y)
+                elif self.grid.grid[y][x] == c.WIFEY_ID:
+                    goal_pos = (x, y)
+                if player_pos and goal_pos:
+                    break
+            if player_pos and goal_pos:
+                break
+
+        if not player_pos or not goal_pos:
+            print("Player or goal not found.")
+            return
+
+        # Run the search algorithms
+        bfs_path, bfs_runtime = self.grid.bfs(player_pos, goal_pos)
+        dfs_path, dfs_runtime = self.grid.dfs(player_pos, goal_pos)
+        ucs_path, ucs_runtime = self.grid.ucs(player_pos, goal_pos)
+        astar_path, astar_runtime = self.grid.astar(player_pos, goal_pos)
+
+        # Store the results
+        self.search_results = {
+            'BFS': bfs_runtime,
+            'DFS': dfs_runtime,
+            'UCS': ucs_runtime,
+            'A*': astar_runtime
+        }
+
+        # Optionally, you can store the paths as well
+        self.search_paths = {
+            'BFS': bfs_path,
+            'DFS': dfs_path,
+            'UCS': ucs_path,
+            'A*': astar_path
+        }
+
+        # For debugging, print the runtimes
+        print("Search algorithm runtimes:")
+        for alg, runtime in self.search_results.items():
+            print(f"{alg}: {runtime:.6f} seconds")
+
+        # Optionally, you can visualize the path on the grid
+        # self.grid.display_path(bfs_path)  # Implement display_path method if needed
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ WINDOW_SIZE = 800
 SIDEBAR_WIDTH = 100
 PYGAME_FONT = 27
 GRID_WIDTH = 1
+RESULT_FONT_SIZE = 20
 
 EMPTY_CELL_ID = 0
 WALL_ID = 1
@@ -15,6 +16,15 @@ KID2_ID = 4
 WIFEY_ID = 5
 LAVA_ID = 6
 MOUNTAIN_ID = 7
+
+CELL_COSTS = {
+    EMPTY_CELL_ID: 1,
+    WALL_ID: float('inf'),  # Walls are impassable
+    LAVA_ID: float('inf'),  # Lava is impassable
+    MOUNTAIN_ID: 10,
+    PLAYER_ID: 1,
+    WIFEY_ID: 1,
+}
 
 # COLORS _________________________________
 
@@ -40,9 +50,5 @@ SIDEBAR_PADDING = 10  # Padding from top and bottom of the sidebar
 
 MAP_CHECK_Y = WINDOW_SIZE - 160
 RUN_BUTTON_Y = WINDOW_SIZE - 80
-
-
-
-
 
 # ________________________________________
