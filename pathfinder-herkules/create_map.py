@@ -27,6 +27,7 @@ class Grid:
         self.kid1_image = self.upload_and_scale_image("./images/kid1.jpeg")
         self.kid2_image = self.upload_and_scale_image("./images/kid2.jpeg")
         self.hera_image = self.upload_and_scale_image("./images/hera.jpeg")
+        self.lava_image = self.upload_and_scale_image("./images/lava.jpg")
 
     def upload_and_scale_image(self, image_path: str) -> pygame.Surface:
         image = pygame.image.load(image_path)
@@ -110,6 +111,8 @@ class Grid:
                     screen.blit(self.player_image, rect.topleft)
                 elif self.grid[y][x] == c.WIFEY_ID:
                     screen.blit(self.wifey_image, rect.topleft)
+                elif self.grid[y][x] == c.LAVA_ID:
+                    screen.blit(self.lava_image, rect.topleft)
 
                 if check_map and (x, y) in self.violating_cells:
                     s = pygame.Surface((self.cell_size, self.cell_size), pygame.SRCALPHA)
@@ -141,6 +144,8 @@ class Grid:
         elif tool == "wifey" and not self.goal_in_the_game:
             self.grid[y][x] = c.WIFEY_ID
             self.goal_in_the_game = True
+        elif tool == "lava":
+            self.grid[y][x] = c.LAVA_ID
 
         self.update_violating_cells()
 
@@ -192,6 +197,13 @@ class Sidebar:
         wifey_text = font.render("Wifey", True, c.WHITE)  # antialiasing -> making the text smoother
         screen.blit(wifey_text, (c.BUTTON_TEXT_X, c.WIFEY_TEXT_Y))  # Position text on the button
 
+        # Draw the lava button
+        lava_button = pygame.Rect(c.BUTTON_X, c.LAVA_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
+        lava_color = c.BLACK if self.selected_tool == "lava" else c.DARK_GREY  # Highlight if selected
+        pygame.draw.rect(screen, lava_color, lava_button)
+        lava_text = font.render("Lava", True, c.WHITE)  # antialiasing -> making the text smoother
+        screen.blit(lava_text, (c.BUTTON_TEXT_X, c.LAVA_TEXT_Y))  # Position text on the button
+
         # Draw "Check Map" slider
         slider_rect = pygame.Rect(c.BUTTON_X, c.SLIDER_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
         pygame.draw.rect(screen, c.DARK_GREY, slider_rect, border_radius=20)
@@ -205,7 +217,7 @@ class Sidebar:
         slider_text = font.render("Check Map", True, c.BLACK)
         screen.blit(slider_text, (c.BUTTON_X - 10, c.SLIDER_Y - 20))
 
-        button_list = [wall_button, eraser_button, player_button, wifey_button, slider_rect]
+        button_list = [wall_button, eraser_button, player_button, wifey_button, slider_rect, lava_button]
 
         return button_list
 
@@ -238,7 +250,7 @@ class Game:
 
             # Draw the grid and sidebar
             self.grid.draw(self.screen, self.sidebar.check_map)
-            wall_button, eraser_button, player_button, wifey_button, slider_rect = (
+            wall_button, eraser_button, player_button, wifey_button, slider_rect, lava_button = (
                 self.sidebar.draw(self.screen, self.grid.valid_map))
 
             for event in pygame.event.get():
@@ -257,6 +269,8 @@ class Game:
                         self.sidebar.select_tool("player")
                     elif wifey_button.collidepoint(mouse_x, mouse_y):  # If click on "Wifey" button
                         self.sidebar.select_tool("wifey")
+                    elif lava_button.collidepoint(mouse_x, mouse_y):  # If click on "Lava" button
+                        self.sidebar.select_tool("lava")
                     elif slider_rect.collidepoint(mouse_x, mouse_y):  # If "Check Map" button is clicked
                         self.sidebar.toggle_check_map()
 

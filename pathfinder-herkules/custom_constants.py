@@ -13,6 +13,7 @@ PLAYER_ID = 2
 KID1_ID = 3
 KID2_ID = 4
 WIFEY_ID = 5
+LAVA_ID = 6
 
 # COLORS _________________________________
 
@@ -43,6 +44,11 @@ PLAYER_TEXT_Y = 200
 WIFEY_Y = 260
 WIFEY_TEXT_Y = 270
 
+LAVA_Y = 330
+LAVA_TEXT_Y = 340
+
 SLIDER_Y = WINDOW_SIZE - 100
+
+
 
 # ________________________________________
