@@ -164,7 +164,7 @@ class Sidebar:
         self.selected_tool = "wall"
         self.check_map = False
 
-    def draw(self, screen: pygame.Surface, valid_map: bool) -> Tuple[List[Rect], Rect]:
+    def draw(self, screen: pygame.Surface, valid_map: bool) -> Tuple[List[Rect], Rect, Rect]:
         """
         Draws a sidebar with tool buttons and a "Check Map" slider.
 
@@ -186,7 +186,6 @@ class Sidebar:
             button_color = c.BLACK if self.selected_tool == label.lower() else c.DARK_GREY
             pygame.draw.rect(screen, button_color, button_rect)
 
-            # Button text
             button_text = font.render(label, True, c.WHITE)
             text_x = c.BUTTON_X + (c.BUTTON_WIDTH - button_text.get_width()) // 2
             text_y = current_y + (c.BUTTON_HEIGHT - button_text.get_height()) // 2
@@ -197,9 +196,30 @@ class Sidebar:
 
         # Draw "Check Map" slider
         slider_rect = self.draw_slider(screen, font, current_y, valid_map)
+        current_y += c.BUTTON_SPACING + c.BUTTON_HEIGHT  # Move y-position below the slider
 
-        # Return tool buttons and slider separately
-        return tool_buttons, slider_rect
+        # Draw "RUN" button always, but change its appearance based on validity
+        run_button_rect = pygame.Rect(c.BUTTON_X, c.RUN_BUTTON_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
+        if self.check_map and valid_map:
+            run_button_color = c.BLUE  # Active RUN button color
+            run_button_text_color = c.WHITE
+        else:
+            run_button_color = c.DARK_GREY  # Inactive RUN button color
+            run_button_text_color = c.LIGHT_GREY
+
+        pygame.draw.rect(screen, run_button_color, run_button_rect, border_radius=5)
+
+        run_button_text = font.render("RUN", True, run_button_text_color)
+        text_x = run_button_rect.x + (c.BUTTON_WIDTH - run_button_text.get_width()) // 2
+        text_y = run_button_rect.y + (c.BUTTON_HEIGHT - run_button_text.get_height()) // 2
+        screen.blit(run_button_text, (text_x, text_y))
+
+        # Optional: Add a border to indicate it's clickable when active
+        if self.check_map and valid_map:
+            pygame.draw.rect(screen, c.GREEN, run_button_rect, 2, border_radius=5)
+
+        # Return tool buttons, slider_rect, and run_button_rect
+        return tool_buttons, slider_rect, run_button_rect
 
     def draw_slider(self, screen: pygame.Surface, font: pygame.font.Font, current_y: int, valid_map: bool) -> Rect:
         """
@@ -211,10 +231,10 @@ class Sidebar:
         :param valid_map: whether the current map is valid
         :return: slider Rect for collision detection
         """
-        slider_rect = pygame.Rect(c.BUTTON_X, c.WINDOW_SIZE - 80, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
+
+        slider_rect = pygame.Rect(c.BUTTON_X, c.MAP_CHECK_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
         pygame.draw.rect(screen, c.DARK_GREY, slider_rect, border_radius=20)
 
-        # Position the circle based on the toggle state
         circle_x = slider_rect.x + 20 if not self.check_map else slider_rect.x + c.BUTTON_WIDTH - 20
         circle_y = slider_rect.y + c.BUTTON_HEIGHT // 2
 
@@ -264,7 +284,7 @@ class Game:
             self.grid.draw(self.screen, self.sidebar.check_map)
 
             # Draw the sidebar and get tool buttons and slider
-            tool_buttons, slider_rect = self.sidebar.draw(self.screen, self.grid.valid_map)
+            tool_buttons, slider, run_button = self.sidebar.draw(self.screen, self.grid.valid_map)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -274,15 +294,24 @@ class Game:
                     mouse_x, mouse_y = pygame.mouse.get_pos()
 
                     # Check if a tool button is clicked
+                    tool_clicked = False
                     for index, button_rect in enumerate(tool_buttons):
                         if button_rect.collidepoint(mouse_x, mouse_y):
                             selected_tool = c.BUTTON_LABELS[index].lower()
                             self.sidebar.select_tool(selected_tool)
+                            tool_clicked = True
                             break  # Exit after handling the button click
 
-                    else:  # Only check slider if no tool button was clicked
-                        if slider_rect.collidepoint(mouse_x, mouse_y):
+                    if not tool_clicked:
+                        # Check if slider was clicked
+                        if slider.collidepoint(mouse_x, mouse_y):
                             self.sidebar.toggle_check_map()
+                        # Check if RUN button was clicked and is active
+                        elif run_button.collidepoint(mouse_x, mouse_y):
+                            if self.sidebar.check_map and self.grid.valid_map:
+                                self.run_game()
+                            else:
+                                print("RUN button is inactive. Please ensure the map is valid and checked.")
 
                 elif event.type == pygame.MOUSEBUTTONUP:
                     self.mouse_held = False
@@ -299,6 +328,14 @@ class Game:
 
         pygame.quit()  # Close the window and quit the game
         sys.exit()  # Exit the program
+
+    def run_game(self):
+        """
+        Action to perform when the RUN button is clicked.
+        Replace this method's content with the actual game logic.
+        """
+        print("RUN button clicked! Starting the game...")
+        # TODO: Implement the actual RUN logic here
 
 
 if __name__ == "__main__":

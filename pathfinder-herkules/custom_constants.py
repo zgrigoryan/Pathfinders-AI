@@ -25,6 +25,7 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
 
 # SIDEBAR ________________________________
 
@@ -36,6 +37,9 @@ BUTTON_TEXT_X = WINDOW_SIZE + 20
 BUTTON_LABELS = ["Wall", "Eraser", "Player", "Wifey", "Lava", "Mountain"]
 BUTTON_SPACING = 20  # Spacing between buttons
 SIDEBAR_PADDING = 10  # Padding from top and bottom of the sidebar
+
+MAP_CHECK_Y = WINDOW_SIZE - 160
+RUN_BUTTON_Y = WINDOW_SIZE - 80
 
 
 
