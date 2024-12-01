@@ -3,7 +3,7 @@
 # Global _________________________________
 
 WINDOW_SIZE = 800
-SIDEBAR_WIDTH = 100
+SIDEBAR_WIDTH = 140
 PYGAME_FONT = 27
 GRID_WIDTH = 1
 RESULT_FONT_SIZE = 20
@@ -39,7 +39,7 @@ BLUE = (0, 0, 255)
 
 # SIDEBAR ________________________________
 
-BUTTON_WIDTH = 80
+BUTTON_WIDTH = 100
 BUTTON_HEIGHT = 40
 BUTTON_X = WINDOW_SIZE + 10
 BUTTON_TEXT_X = WINDOW_SIZE + 20
