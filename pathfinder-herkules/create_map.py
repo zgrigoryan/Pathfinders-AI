@@ -1,17 +1,15 @@
 import pygame
 import sys
-
 from pygame import Rect
-
 import custom_constants as c
-from typing import List
-# from utils import ask_input
-
+from typing import List, Tuple
 from collections import deque
-
+#from utils import ask_input
 
 class Grid:
-    # noinspection SpellCheckingInspection
+    """
+    Class to represent the grid and its properties.
+    """
     def __init__(self, grid_size: int):
         self.grid_size = grid_size
         self.cell_size = c.WINDOW_SIZE // grid_size
@@ -19,28 +17,29 @@ class Grid:
         self.player_in_the_game = False
         self.goal_in_the_game = False
         self.valid_map = False
-
         self.violating_cells = set()
 
+        # Load and scale images
         self.wall_image = self.upload_and_scale_image("./images/wall.jpeg")
         self.player_image = self.upload_and_scale_image("./images/hercules.jpeg")
         self.wifey_image = self.upload_and_scale_image("./images/wifey.jpeg")
-        self.kid1_image = self.upload_and_scale_image("./images/kid1.jpeg")
-        self.kid2_image = self.upload_and_scale_image("./images/kid2.jpeg")
-        self.hera_image = self.upload_and_scale_image("./images/hera.jpeg")
         self.lava_image = self.upload_and_scale_image("./images/lava.jpg")
         self.mountain_image = self.upload_and_scale_image("./images/mountain.jpg")
 
     def upload_and_scale_image(self, image_path: str) -> pygame.Surface:
+        """
+        Load and scale the image to the cell size.
+        :param image_path: path to the image file
+        :return: pygame object
+        """
         image = pygame.image.load(image_path)
         image = pygame.transform.scale(image, (self.cell_size, self.cell_size))
-
         return image
 
     def update_violating_cells(self) -> None:
         """
-        Update the set of violating cells by performing a BFS from the edges of the grid.
-        Also, validate that the player and goal are fully enclosed by walls.
+        Highlight with red all the violations and check if the map is valid.
+        :return: None
         """
         self.violating_cells.clear()
         visited = set()
@@ -93,9 +92,7 @@ class Grid:
 
         # Check if player and goal are enclosed
         if player_pos and goal_pos:
-            # Player is enclosed if not in violating_cells
             player_enclosed = player_pos not in self.violating_cells
-            # Goal is enclosed if not in violating_cells
             goal_enclosed = goal_pos not in self.violating_cells
 
         self.valid_map = player_enclosed and goal_enclosed and self.player_in_the_game and self.goal_in_the_game
@@ -103,6 +100,12 @@ class Grid:
             self.violating_cells.clear()
 
     def draw(self, screen: pygame.Surface, check_map: bool) -> None:
+        """
+        Draw the grid on the screen, with all the elements.
+        :param screen: pygame object
+        :param check_map: if map is valid or no
+        :return: None
+        """
         for y in range(self.grid_size):
             for x in range(self.grid_size):
                 rect = pygame.Rect(x * self.cell_size, y * self.cell_size, self.cell_size, self.cell_size)
@@ -137,11 +140,11 @@ class Grid:
             self.player_in_the_game = False
         if self.grid[y][x] == c.WIFEY_ID:
             self.goal_in_the_game = False
+
         if tool == "wall":
             self.grid[y][x] = c.WALL_ID
         elif tool == "eraser":
             self.grid[y][x] = c.EMPTY_CELL_ID
-        # Add player to the game only if there is no player in the game
         elif tool == "player" and not self.player_in_the_game:
             self.grid[y][x] = c.PLAYER_ID
             self.player_in_the_game = True
@@ -161,85 +164,75 @@ class Sidebar:
         self.selected_tool = "wall"
         self.check_map = False
 
-    def draw(self, screen: pygame.Surface, valid_map: bool) -> List[Rect]:
+    def draw(self, screen: pygame.Surface, valid_map: bool) -> Tuple[List[Rect], Rect]:
         """
-        Draws a sidebar with "Wall" and "Eraser" buttons on the screen.
+        Draws a sidebar with tool buttons and a "Check Map" slider.
 
         :param screen: pygame screen surface
         :param valid_map: whether the current map is valid
         :return: wall_button and eraser_button as Rect objects for collision detection
         """
-
         font = pygame.font.Font(None, c.PYGAME_FONT)  # Set font for button labels
 
-        # Draw the sidebar initialization and background
+        # Draw the sidebar background
         sidebar_rect = pygame.Rect(c.WINDOW_SIZE, 0, c.SIDEBAR_WIDTH, c.WINDOW_SIZE)
         pygame.draw.rect(screen, c.LIGHT_GREY, sidebar_rect)
 
-        # Draw "Wall" button
-        wall_button = pygame.Rect(c.BUTTON_X, c.WALL_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)  # Button rectangle
-        wall_color = c.BLACK if self.selected_tool == "wall" else c.DARK_GREY  # Highlight if selected
-        pygame.draw.rect(screen, wall_color, wall_button)
-        wall_text = font.render("Wall", True, c.WHITE)  # antialiasing -> making the text smoother
-        screen.blit(wall_text, (c.BUTTON_TEXT_X, c.WALL_TEXT_Y))  # Position text on the button
+        # Draw tool buttons
+        tool_buttons = []
+        current_y = c.SIDEBAR_PADDING
+        for label in c.BUTTON_LABELS:
+            button_rect = pygame.Rect(c.BUTTON_X, current_y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
+            button_color = c.BLACK if self.selected_tool == label.lower() else c.DARK_GREY
+            pygame.draw.rect(screen, button_color, button_rect)
 
-        # Draw "Eraser" button
-        eraser_button = pygame.Rect(c.BUTTON_X, c.ERASER_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
-        eraser_color = c.BLACK if self.selected_tool == "eraser" else c.DARK_GREY  # Highlight if selected
-        pygame.draw.rect(screen, eraser_color, eraser_button)
-        eraser_text = font.render("Eraser", True, c.WHITE)  # antialiasing -> making the text smoother
-        screen.blit(eraser_text, (c.BUTTON_TEXT_X, c.ERASER_TEXT_Y))  # Position text on the button
+            # Button text
+            button_text = font.render(label, True, c.WHITE)
+            text_x = c.BUTTON_X + (c.BUTTON_WIDTH - button_text.get_width()) // 2
+            text_y = current_y + (c.BUTTON_HEIGHT - button_text.get_height()) // 2
+            screen.blit(button_text, (text_x, text_y))
 
-        # Draw "Player" button
-        player_button = pygame.Rect(c.BUTTON_X, c.PLAYER_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
-        player_color = c.BLACK if self.selected_tool == "player" else c.DARK_GREY  # Highlight if selected
-        pygame.draw.rect(screen, player_color, player_button)
-        player_text = font.render("Player", True, c.WHITE)  # antialiasing -> making the text smoother
-        screen.blit(player_text, (c.BUTTON_TEXT_X, c.PLAYER_TEXT_Y))  # Position text on the button
-
-        # Draw the wifey button
-        wifey_button = pygame.Rect(c.BUTTON_X, c.WIFEY_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
-        wifey_color = c.BLACK if self.selected_tool == "wifey" else c.DARK_GREY  # Highlight if selected
-        pygame.draw.rect(screen, wifey_color, wifey_button)
-        wifey_text = font.render("Wifey", True, c.WHITE)  # antialiasing -> making the text smoother
-        screen.blit(wifey_text, (c.BUTTON_TEXT_X, c.WIFEY_TEXT_Y))  # Position text on the button
-
-        # Draw the lava button
-        lava_button = pygame.Rect(c.BUTTON_X, c.LAVA_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
-        lava_color = c.BLACK if self.selected_tool == "lava" else c.DARK_GREY  # Highlight if selected
-        pygame.draw.rect(screen, lava_color, lava_button)
-        lava_text = font.render("Lava", True, c.WHITE)  # antialiasing -> making the text smoother
-        screen.blit(lava_text, (c.BUTTON_TEXT_X, c.LAVA_TEXT_Y))  # Position text on the button
-
-        # Draw the mountain button
-        mountain_button = pygame.Rect(c.BUTTON_X, c.MOUNTAIN_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
-        mountain_color = c.BLACK if self.selected_tool == "mountain" else c.DARK_GREY  # Highlight if selected
-        pygame.draw.rect(screen, mountain_color, mountain_button)
-        mountain_text = font.render("Mountain", True, c.WHITE)  # antialiasing -> making the text smoother
-        screen.blit(mountain_text, (c.BUTTON_TEXT_X, c.MOUNTAIN_TEXT_Y))  # Position text on the button
+            tool_buttons.append(button_rect)
+            current_y += c.BUTTON_HEIGHT + c.BUTTON_SPACING
 
         # Draw "Check Map" slider
-        slider_rect = pygame.Rect(c.BUTTON_X, c.SLIDER_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
+        slider_rect = self.draw_slider(screen, font, current_y, valid_map)
+
+        # Return tool buttons and slider separately
+        return tool_buttons, slider_rect
+
+    def draw_slider(self, screen: pygame.Surface, font: pygame.font.Font, current_y: int, valid_map: bool) -> Rect:
+        """
+        Draws the "Check Map" slider below the tool buttons.
+
+        :param screen: pygame screen surface
+        :param font: pygame font object
+        :param current_y: current y-position after the last button
+        :param valid_map: whether the current map is valid
+        :return: slider Rect for collision detection
+        """
+        slider_rect = pygame.Rect(c.BUTTON_X, c.WINDOW_SIZE - 80, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
         pygame.draw.rect(screen, c.DARK_GREY, slider_rect, border_radius=20)
-        circle_x = c.BUTTON_X + 20 if not self.check_map else c.BUTTON_X + c.BUTTON_WIDTH - 20
-        circle_y = c.SLIDER_Y + c.BUTTON_HEIGHT // 2
+
+        # Position the circle based on the toggle state
+        circle_x = slider_rect.x + 20 if not self.check_map else slider_rect.x + c.BUTTON_WIDTH - 20
+        circle_y = slider_rect.y + c.BUTTON_HEIGHT // 2
+
+        # Set circle color based on the state and map validity
         if self.check_map:
             circle_color = c.GREEN if valid_map else c.RED
         else:
             circle_color = c.WHITE
+
         pygame.draw.circle(screen, circle_color, (circle_x, circle_y), c.BUTTON_WIDTH // 4)
+
+        # Draw slider label
         slider_text = font.render("Check Map", True, c.BLACK)
-        screen.blit(slider_text, (c.BUTTON_X - 10, c.SLIDER_Y - 20))
+        text_x = slider_rect.x + (c.BUTTON_WIDTH - slider_text.get_width()) // 2
+        text_y = slider_rect.y - 25  # Adjust as needed for spacing
+        screen.blit(slider_text, (text_x, text_y))
 
-        button_list = [wall_button,
-                       eraser_button,
-                       player_button,
-                       wifey_button,
-                       slider_rect,
-                       lava_button,
-                       mountain_button]
-
-        return button_list
+        return slider_rect
 
     def toggle_check_map(self) -> None:
         self.check_map = not self.check_map  # Toggle the state
@@ -251,7 +244,6 @@ class Sidebar:
 class Game:
     def __init__(self):
         pygame.init()
-        # self.grid_size = ask_input()
         self.grid_size = 10
 
         # Extend window width to fit the sidebar
@@ -268,10 +260,11 @@ class Game:
         while self.running:
             self.screen.fill(c.WHITE)
 
-            # Draw the grid and sidebar
+            # Draw the grid
             self.grid.draw(self.screen, self.sidebar.check_map)
-            wall_button, eraser_button, player_button, wifey_button, slider_rect, lava_button, mountain_button = (
-                self.sidebar.draw(self.screen, self.grid.valid_map))
+
+            # Draw the sidebar and get tool buttons and slider
+            tool_buttons, slider_rect = self.sidebar.draw(self.screen, self.grid.valid_map)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -281,20 +274,15 @@ class Game:
                     mouse_x, mouse_y = pygame.mouse.get_pos()
 
                     # Check if a tool button is clicked
-                    if wall_button.collidepoint(mouse_x, mouse_y):  # If click on "Wall" button
-                        self.sidebar.select_tool("wall")
-                    elif eraser_button.collidepoint(mouse_x, mouse_y):  # If click on "Eraser" button
-                        self.sidebar.select_tool("eraser")
-                    elif player_button.collidepoint(mouse_x, mouse_y):  # If click on "Player" button
-                        self.sidebar.select_tool("player")
-                    elif wifey_button.collidepoint(mouse_x, mouse_y):  # If click on "Wifey" button
-                        self.sidebar.select_tool("wifey")
-                    elif lava_button.collidepoint(mouse_x, mouse_y):  # If click on "Lava" button
-                        self.sidebar.select_tool("lava")
-                    elif mountain_button.collidepoint(mouse_x, mouse_y):  # If click on "Mountain" button
-                        self.sidebar.select_tool("mountain")
-                    elif slider_rect.collidepoint(mouse_x, mouse_y):  # If "Check Map" button is clicked
-                        self.sidebar.toggle_check_map()
+                    for index, button_rect in enumerate(tool_buttons):
+                        if button_rect.collidepoint(mouse_x, mouse_y):
+                            selected_tool = c.BUTTON_LABELS[index].lower()
+                            self.sidebar.select_tool(selected_tool)
+                            break  # Exit after handling the button click
+
+                    else:  # Only check slider if no tool button was clicked
+                        if slider_rect.collidepoint(mouse_x, mouse_y):
+                            self.sidebar.toggle_check_map()
 
                 elif event.type == pygame.MOUSEBUTTONUP:
                     self.mouse_held = False

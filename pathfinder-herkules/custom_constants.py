@@ -2,7 +2,7 @@
 
 # Global _________________________________
 
-WINDOW_SIZE = 600
+WINDOW_SIZE = 800
 SIDEBAR_WIDTH = 100
 PYGAME_FONT = 27
 GRID_WIDTH = 1
@@ -33,25 +33,11 @@ BUTTON_HEIGHT = 40
 BUTTON_X = WINDOW_SIZE + 10
 BUTTON_TEXT_X = WINDOW_SIZE + 20
 
-WALL_Y = 50
-WALL_TEXT_Y = 60
+BUTTON_LABELS = ["Wall", "Eraser", "Player", "Wifey", "Lava", "Mountain"]
+BUTTON_SPACING = 20  # Spacing between buttons
+SIDEBAR_PADDING = 10  # Padding from top and bottom of the sidebar
 
-ERASER_Y = 120
-ERASER_TEXT_Y = 130
 
-PLAYER_Y = 190
-PLAYER_TEXT_Y = 200
-
-WIFEY_Y = 260
-WIFEY_TEXT_Y = 270
-
-LAVA_Y = 330
-LAVA_TEXT_Y = 340
-
-MOUNTAIN_Y = 400
-MOUNTAIN_TEXT_Y = 410
-
-SLIDER_Y = WINDOW_SIZE - 100
 
 
 
