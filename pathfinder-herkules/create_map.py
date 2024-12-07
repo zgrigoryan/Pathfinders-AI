@@ -6,11 +6,14 @@ from typing import List, Tuple
 from collections import deque
 import time
 import random
+import csv
+
 
 class Grid:
     """
     Class to represent the grid and its properties.
     """
+
     def __init__(self, grid_size: int):
         self.grid_size = grid_size
         self.cell_size = c.WINDOW_SIZE // grid_size
@@ -303,7 +306,7 @@ class Grid:
 
                 # Place a small number of obstacles randomly
                 num_internal_cells = (self.grid_size - 2) * (self.grid_size - 2)
-                num_obstacles = num_internal_cells // 10  # ~10%
+                num_obstacles = num_internal_cells // 2  # ~50% of internal cells as obstacles
 
                 placed = 0
                 while placed < num_obstacles:
@@ -417,27 +420,40 @@ class Sidebar:
 
 
 class Game:
-    def __init__(self, auto_map: bool = True):
+    def __init__(self, auto_map: bool = True, experiment: bool = False):
         pygame.init()
-        self.grid_size = 50
+        self.grid_size = 200
         self.screen = pygame.display.set_mode((c.WINDOW_SIZE + c.SIDEBAR_WIDTH, c.WINDOW_SIZE))
         pygame.display.set_caption("Hercules finds his path underworld")
         self.grid = Grid(self.grid_size)
         self.sidebar = Sidebar()
         self.running = True
         self.mouse_held = False
+        self.experiment = experiment
 
-        # Automatically create map if auto_map is True
-        if auto_map:
-            player_pos = (1, self.grid_size - 2)  # Player at lower-left inside the boundary
-            goal_pos = (self.grid_size - 2, 1)    # Goal at upper-right inside the boundary
-            self.grid.create_auto_map(player_pos, goal_pos, place_obstacles=True)
+        # Helper function to generate random internal positions
+        def random_internal_position(grid_size):
+            return (random.randint(1, grid_size - 2), random.randint(1, grid_size - 2))
 
-        self.grid.update_violating_cells()
-        self.search_paths = None
-        self.search_results = None
+        if not experiment:
+            # Automatically create map with random player and goal positions if auto_map is True
+            if auto_map:
+                player_pos = random_internal_position(self.grid_size)
+                goal_pos = random_internal_position(self.grid_size)
+                while goal_pos == player_pos:
+                    goal_pos = random_internal_position(self.grid_size)
+
+                self.grid.create_auto_map(player_pos, goal_pos, place_obstacles=True)
+
+            self.grid.update_violating_cells()
+            self.search_paths = None
+            self.search_results = None
 
     def run(self) -> None:
+        if self.experiment:
+            self.run_experiments()
+            return
+
         while self.running:
             self.screen.fill(c.WHITE)
             self.grid.draw(self.screen, self.sidebar.check_map)
@@ -537,11 +553,62 @@ class Game:
         for alg, runtime in self.search_results.items():
             print(f"{alg}: {runtime:.6f} seconds")
 
+    def run_experiments(self, runs=100, grid_size=1000):
+        # Helper function to generate random internal positions
+        def random_internal_position(gs):
+            return (random.randint(1, gs - 2), random.randint(1, gs - 2))
+
+        # Results file
+        results_file = "results.csv"
+        fieldnames = ["Run_number", "BFS", "DFS", "UCS", "A*"]
+
+        # Write header
+        with open(results_file, "w", newline="") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+
+        for i in range(1, runs + 1):
+            player_pos = random_internal_position(grid_size)
+            goal_pos = random_internal_position(grid_size)
+            while goal_pos == player_pos:
+                goal_pos = random_internal_position(grid_size)
+
+            # Create new map
+            self.grid = Grid(grid_size)
+            self.grid.create_auto_map(player_pos, goal_pos, place_obstacles=True)
+
+            # If map isn't valid after generation, just continue
+            if not self.grid.valid_map:
+                continue
+
+            # Run searches
+            _, bfs_runtime = self.grid.bfs(player_pos, goal_pos)
+            _, dfs_runtime = self.grid.dfs(player_pos, goal_pos)
+            _, ucs_runtime = self.grid.ucs(player_pos, goal_pos)
+            _, astar_runtime = self.grid.astar(player_pos, goal_pos)
+
+            # Save results to CSV in the requested format
+            with open(results_file, "a", newline="") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writerow({
+                    "Run_number": i,
+                    "BFS": bfs_runtime,
+                    "DFS": dfs_runtime,
+                    "UCS": ucs_runtime,
+                    "A*": astar_runtime
+                })
+
+        print(f"Experiment completed. Results saved to {results_file}")
+
 
 if __name__ == "__main__":
-    # Check for --no-auto-map argument
+    # Check for arguments
     auto_map = True
+    experiment = False
     if "--no-auto-map" in sys.argv:
         auto_map = False
-    game = Game(auto_map=auto_map)
+    if "--experiment" in sys.argv:
+        experiment = True
+
+    game = Game(auto_map=auto_map, experiment=experiment)
     game.run()
