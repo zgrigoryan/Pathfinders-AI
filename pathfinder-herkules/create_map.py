@@ -7,7 +7,8 @@ from collections import deque
 import time
 import random
 import csv
-#from utils import ask_input
+from utils import ask_input
+
 
 class Grid:
     """
@@ -25,12 +26,12 @@ class Grid:
 
         self.path_to_display = None
 
-        # Load and scale images
         self.wall_image = self.upload_and_scale_image("./images/wall.jpeg")
         self.player_image = self.upload_and_scale_image("./images/hercules.jpeg")
         self.wifey_image = self.upload_and_scale_image("./images/wifey.jpeg")
         self.lava_image = self.upload_and_scale_image("./images/lava.jpg")
         self.mountain_image = self.upload_and_scale_image("./images/mountain.jpg")
+        self.hidra_image = self.upload_and_scale_image("./images/hidra.jpg")
 
     def upload_and_scale_image(self, image_path: str) -> pygame.Surface:
         """
@@ -77,7 +78,6 @@ class Grid:
                         visited.add((nx, ny))
                         queue.append((nx, ny))
 
-        # Initialize flags
         player_enclosed = False
         goal_enclosed = False
 
@@ -105,11 +105,12 @@ class Grid:
         if self.valid_map:
             self.violating_cells.clear()
 
-    def draw(self, screen: pygame.Surface, check_map: bool) -> None:
+    def draw(self, screen: pygame.Surface, check_map: bool, killed_hidras: List[Tuple[int, int]]) -> None:
         """
         Draw the grid on the screen, with all the elements.
         :param screen: pygame object
         :param check_map: if map is valid or no
+        :param killed_hidras: list of positions where hydras were killed
         :return: None
         """
         for y in range(self.grid_size):
@@ -126,18 +127,25 @@ class Grid:
                     screen.blit(self.lava_image, rect.topleft)
                 elif self.grid[y][x] == c.MOUNTAIN_ID:
                     screen.blit(self.mountain_image, rect.topleft)
+                elif self.grid[y][x] == c.HIDRA_ID:
+                    screen.blit(self.hidra_image, rect.topleft)
 
                 if check_map and (x, y) in self.violating_cells:
                     s = pygame.Surface((self.cell_size, self.cell_size), pygame.SRCALPHA)
-                    s.fill((255, 0, 0, 100))  # Red color with alpha for transparency
+                    s.fill(c.RED_WITH_TRANSPARENCY_ALPHA)  # Red color with alpha for transparency
                     screen.blit(s, rect.topleft)
 
                 if self.path_to_display and (x, y) in self.path_to_display:
                     s = pygame.Surface((self.cell_size, self.cell_size), pygame.SRCALPHA)
-                    s.fill((0, 255, 0, 100))  # Green overlay for the path
+                    s.fill(c.GREEN_WITH_TRANSPARENCY_ALPHA)  # Green overlay for the path
                     screen.blit(s, rect.topleft)
 
                 pygame.draw.rect(screen, c.GREY, rect, c.GRID_WIDTH)
+
+        # Draw killed hydras
+        for hx, hy in killed_hidras:
+            rect = pygame.Rect(hx * self.cell_size, hy * self.cell_size, self.cell_size, self.cell_size)
+            screen.blit(self.hidra_image, rect.topleft)
 
     def display_path(self, path):
         self.path_to_display = path
@@ -169,6 +177,11 @@ class Grid:
             self.grid[y][x] = c.LAVA_ID
         elif tool == "mountain":
             self.grid[y][x] = c.MOUNTAIN_ID
+        elif tool == "hidra":  # Optional: allow placing hydra manually
+            self.grid[y][x] = c.HIDRA_ID
+            # Initialize hydra state
+            self.hydra_position = (x, y)
+            self.hydra_heads = 3
 
         self.update_violating_cells()
 
@@ -193,7 +206,8 @@ class Grid:
             for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
-                    if (nx, ny) not in visited and self.grid[ny][nx] != c.WALL_ID:
+                    cell_id = self.grid[ny][nx]
+                    if (nx, ny) not in visited and cell_id != c.WALL_ID and cell_id != c.HIDRA_ID:
                         visited.add((nx, ny))
                         queue.append(((nx, ny), path + [(nx, ny)]))
         runtime = time.perf_counter() - start_time
@@ -218,7 +232,8 @@ class Grid:
             for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
-                    if (nx, ny) not in visited and self.grid[ny][nx] != c.WALL_ID:
+                    cell_id = self.grid[ny][nx]
+                    if (nx, ny) not in visited and cell_id != c.WALL_ID and cell_id != c.HIDRA_ID:
                         visited.add((nx, ny))
                         stack.append(((nx, ny), path + [(nx, ny)]))
         runtime = time.perf_counter() - start_time
@@ -291,7 +306,8 @@ class Grid:
     def create_auto_map(self,
                         player_pos: Tuple[int, int],
                         goal_pos: Tuple[int, int],
-                        place_obstacles: bool = True) -> None:
+                        place_obstacles: bool = True,
+                        monster_enabled: bool = c.HIDRA_ENABLED) -> None:
         """
         Automatically create a map with:
         1. Walls on boundaries.
@@ -302,6 +318,7 @@ class Grid:
         self.grid = [[c.EMPTY_CELL_ID for _ in range(self.grid_size)] for _ in range(self.grid_size)]
         self.player_in_the_game = False
         self.goal_in_the_game = False
+        self.monster_enabled = monster_enabled
 
         # Place boundary walls
         for x in range(self.grid_size):
@@ -326,7 +343,7 @@ class Grid:
             # Attempt to place obstacles while ensuring a path exists
             obstacle_types = [c.LAVA_ID, c.MOUNTAIN_ID]
             attempts = 0
-            max_attempts = 20
+            max_attempts = c.MAX_ATTEMPTS
             path_exists = False
 
             while attempts < max_attempts:
@@ -336,9 +353,8 @@ class Grid:
                         if (xx, yy) not in [player_pos, goal_pos]:
                             self.grid[yy][xx] = c.EMPTY_CELL_ID
 
-                # Place a small number of obstacles randomly
                 num_internal_cells = (self.grid_size - 2) * (self.grid_size - 2)
-                num_obstacles = num_internal_cells // 2  # ~50% of internal cells as obstacles
+                num_obstacles = num_internal_cells // 2  # 50% of internal cells are obstacles
 
                 placed = 0
                 while placed < num_obstacles:
@@ -362,6 +378,29 @@ class Grid:
                     for xx in range(1, self.grid_size - 1):
                         if (xx, yy) not in [player_pos, goal_pos]:
                             self.grid[yy][xx] = c.EMPTY_CELL_ID
+        if self.monster_enabled:
+            # Place Hydra in a random internal cell not occupied by player/goal/obstacle
+            while True:
+                hx = random.randint(1, self.grid_size - 2)
+                hy = random.randint(1, self.grid_size - 2)
+                if self.grid[hy][hx] == c.EMPTY_CELL_ID:
+                    self.grid[hy][hx] = c.HIDRA_ID
+                    # Store hydra state
+                    self.hydra_position = (hx, hy)
+                    self.hydra_heads = 3
+                    break
+        else:
+            self.hydra_position = None
+            self.hydra_heads = 0
+
+        # Place water bottle always
+        # while True:
+        #     wx = random.randint(1, self.grid_size - 2)
+        #     wy = random.randint(1, self.grid_size - 2)
+        #     if self.grid[wy][wx] == c.EMPTY_CELL_ID:
+        #         self.grid[wy][wx] = c.WATER_ID
+        #         self.water_position = (wx, wy)
+        #         break
 
         self.update_violating_cells()
 
@@ -371,7 +410,8 @@ class Sidebar:
         self.selected_tool = "wall"
         self.check_map = False
 
-    def draw(self, screen: pygame.Surface, valid_map: bool, search_results=None, current_algorithm=None) -> Tuple[List[Rect], Rect, Rect]:
+    def draw(self, screen: pygame.Surface, valid_map: bool, search_results=None, current_algorithm=None) -> Tuple[
+        List[Rect], Rect, Rect]:
         """
         Draws a sidebar with tool buttons and a "Check Map" slider.
 
@@ -430,7 +470,7 @@ class Sidebar:
         if search_results:
             result_font = pygame.font.Font(None, c.RESULT_FONT_SIZE)
             for alg_name, runtime in search_results.items():
-                result_text = f"{alg_name}: {runtime * 1000:.2f} ms"
+                result_text = f"{alg_name}: {runtime}"  # runtime is already formatted
                 result_surface = result_font.render(result_text, True, c.BLACK)
                 text_x = c.BUTTON_X
                 screen.blit(result_surface, (text_x, current_y))
@@ -494,11 +534,19 @@ class Sidebar:
 
 
 class Game:
+    ALGORITHM_METHOD_MAPPING = {
+        'UCS': 'ucs',
+        'A*': 'astar'
+    }
+
     def __init__(self, auto_map: bool = True, experiment: bool = False):
         self.search_paths = None
         self.search_results = None
         pygame.init()
-        self.grid_size = 10
+        self.grid_size = c.GRID_SIZE
+        # Ask for grid size if not in experiment mode
+        if not experiment:
+            self.grid_size = ask_input()
 
         # Extend window width to fit the sidebar
         self.screen = pygame.display.set_mode((c.WINDOW_SIZE + c.SIDEBAR_WIDTH, c.WINDOW_SIZE))
@@ -508,6 +556,10 @@ class Game:
         self.running = True
         self.mouse_held = False
         self.experiment = experiment
+
+        # Initialize hydra_killed flag and list of killed hydras
+        self.hydra_killed = False
+        self.killed_hidras = []
 
         # Helper function to generate random internal positions
         def random_internal_position(grid_size):
@@ -539,7 +591,7 @@ class Game:
 
         while self.running:
             self.screen.fill(c.WHITE)
-            self.grid.draw(self.screen, self.sidebar.check_map)
+            self.grid.draw(self.screen, self.sidebar.check_map, self.killed_hidras)
 
             current_algorithm = None
             if self.displaying_paths:
@@ -569,11 +621,17 @@ class Game:
                         self.current_algorithm_index += 1
                         if self.current_algorithm_index < len(self.algorithms_list):
                             current_algorithm = self.algorithms_list[self.current_algorithm_index]
-                            self.grid.display_path(self.search_paths[current_algorithm])
+                            self.grid.display_path(self.search_paths.get(current_algorithm))
                         else:
                             # No more algorithms; stop displaying paths
                             self.displaying_paths = False
                             self.grid.display_path(None)  # Clear the path
+
+                        # If hydra was killed, remove it from the grid
+                        if self.hydra_killed and self.current_algorithm_index > 1:
+                            self.remove_dead_hidras()
+                            self.hydra_killed = False
+
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     self.mouse_held = True
                     mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -644,27 +702,69 @@ class Game:
             print("Player or goal not found.")
             return
 
-        # Run the search algorithms
+        self.perform_searches(player_pos, goal_pos)
+
+    def perform_searches(self, player_pos, goal_pos):
+        # Run BFS and DFS without interacting with the hydra
         bfs_path, bfs_runtime = self.grid.bfs(player_pos, goal_pos)
         dfs_path, dfs_runtime = self.grid.dfs(player_pos, goal_pos)
-        ucs_path, ucs_runtime = self.grid.ucs(player_pos, goal_pos)
-        astar_path, astar_runtime = self.grid.astar(player_pos, goal_pos)
 
-        # Store the results
+        # Initialize search results
         self.search_results = {
-            'BFS': bfs_runtime,
-            'DFS': dfs_runtime,
-            'UCS': ucs_runtime,
-            'A*': astar_runtime
+            'BFS': f"{bfs_runtime * 1000:.2f} ms" if bfs_runtime is not None else "FAIL",
+            'DFS': f"{dfs_runtime * 1000:.2f} ms" if dfs_runtime is not None else "FAIL",
+            'UCS': "FAIL",
+            'A*': "FAIL"
         }
 
-        # Optionally, you can store the paths as well
         self.search_paths = {
             'BFS': bfs_path,
             'DFS': dfs_path,
-            'UCS': ucs_path,
-            'A*': astar_path
+            'UCS': None,
+            'A*': None
         }
+
+        # Run UCS and A* with hydra interaction
+        for algorithm in ['UCS', 'A*']:
+            method_name = self.ALGORITHM_METHOD_MAPPING.get(algorithm)
+            if not method_name:
+                print(f"No method mapping found for algorithm: {algorithm}")
+                continue
+
+            # Dynamically get the method from the Grid class
+            search_method = getattr(self.grid, method_name, None)
+            if not search_method:
+                print(f"Grid class has no method named '{method_name}' for algorithm '{algorithm}'.")
+                continue
+
+            path, runtime = search_method(player_pos, goal_pos)
+            if path:
+                # Path found without needing to kill the hydra
+                self.search_results[algorithm] = f"{runtime * 1000:.2f} ms"
+                self.search_paths[algorithm] = path
+            else:
+                # Attempt to kill the hydra up to 10 times
+                print(f"{algorithm} failed to find a path. Attempting to kill the Hydra...")
+                attempts = 0
+                success = False
+                while attempts < 10: # TODO Change to variable
+                    killed = self.try_kill_hydra()
+                    if killed:
+                        print(f"Hydra killed on attempt {attempts + 1}. Re-running {algorithm}...")
+                        path, runtime = search_method(player_pos, goal_pos)
+                        if path:
+                            self.search_results[algorithm] = f"{runtime * 1000:.2f} ms"
+                            self.search_paths[algorithm] = path
+                            success = True
+                            self.hydra_killed = True  # Flag that hydra was killed
+                            break
+                    else:
+                        print(f"Failed to kill Hydra on attempt {attempts + 1}.")
+                    attempts += 1
+
+                if not success:
+                    self.search_results[algorithm] = "FAIL"
+                    self.search_paths[algorithm] = None
 
         self.displaying_paths = True
         self.current_algorithm_index = 0
@@ -672,13 +772,13 @@ class Game:
 
         # Display the first path
         current_algorithm = self.algorithms_list[self.current_algorithm_index]
-        self.grid.display_path(self.search_paths[current_algorithm])
+        self.grid.display_path(self.search_paths.get(current_algorithm))
 
         print("Search algorithm runtimes:")
         for alg, runtime in self.search_results.items():
-            print(f"{alg}: {runtime:.6f} seconds")
+            print(f"{alg}: {runtime}")
 
-    def run_experiments(self, runs=100, grid_size=1000):
+    def run_experiments(self, runs=100, grid_size=c.GRID_SIZE):
         # Helper function to generate random internal positions
         def random_internal_position(gs):
             return (random.randint(1, gs - 2), random.randint(1, gs - 2))
@@ -724,6 +824,42 @@ class Game:
                 })
 
         print(f"Experiment completed. Results saved to {results_file}")
+
+    def try_kill_hydra(self):
+        """
+        Attempt to kill the hydra. Probability of success = 1/(hydra_heads).
+        If failed, hydra_heads += 1.
+        Returns True if killed, False if not.
+        """
+        if not self.grid.hydra_position:
+            return True  # No hydra present
+
+        success_prob = 1.0 / self.grid.hydra_heads
+        if random.random() < success_prob:
+            # Successfully killed the hydra
+            hx, hy = self.grid.hydra_position
+            self.grid.grid[hy][hx] = c.EMPTY_CELL_ID  # Mark as empty cell
+            self.killed_hidras.append((hx, hy))  # Add to killed hydras list for display
+            self.grid.hydra_position = None
+            self.grid.hydra_heads = 0
+            print("Hydra has been killed!")
+            return True
+        else:
+            # Failed attempt, hydra grows more heads
+            self.grid.hydra_heads += 1
+            print(f"Hydra evaded! It now has {self.grid.hydra_heads} heads.")
+            return False
+
+    def remove_dead_hidras(self):
+        """
+        Remove all killed Hydras from the killed_hidras list.
+        Since the grid cells are already set to EMPTY, nothing else is needed.
+        """
+        if self.killed_hidras:
+            for hx, hy in self.killed_hidras:
+                # They are already set to EMPTY_CELL_ID in try_kill_hydra
+                print(f"Removed killed Hydra at ({hx}, {hy})")
+            self.killed_hidras.clear()
 
 
 if __name__ == "__main__":

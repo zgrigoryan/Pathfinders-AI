@@ -9,8 +9,8 @@ df = pd.read_csv("results.csv")
 # Verify the column names
 print("Columns in DataFrame:", df.columns.tolist())
 
-# Define the list of algorithms to include (excluding A*)
-algorithms = ['BFS', 'DFS', 'UCS']  # Removed 'A*'
+# Define the list of algorithms to include
+algorithms = ['BFS', 'DFS', 'UCS', 'A*']
 
 # Check if all required algorithms are present in the DataFrame
 missing_algorithms = [alg for alg in algorithms if alg not in df.columns]
@@ -28,7 +28,7 @@ df_long = df_long[df_long['Algorithm'].isin(algorithms)]
 sns.set_theme(style="whitegrid")
 
 # Create a figure with two subplots side by side
-fig, axes = plt.subplots(1, 2, figsize=(24, 10))
+fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 
 # ----------------------------
 # 1. Line Plot: Runtime vs Run Number
