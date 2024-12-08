@@ -680,11 +680,8 @@ class Game:
         pygame.quit()  # Close the window and quit the game
         sys.exit()  # Exit the program
 
+    # After generating map, compute energy:
     def run_game(self):
-        """
-        Action to perform when the RUN button is clicked.
-        Runs BFS, DFS, UCS, and A* algorithms and measures their runtimes.
-        """
         print("RUN button clicked! Starting the game...")
 
         # Get the player and goal positions
@@ -705,14 +702,119 @@ class Game:
             print("Player or goal not found.")
             return
 
+        # Compute the initial energy:
+        # energy = grid_size² + (number_of_mountains * 5)
+        mountain_count = 0
+        for row in self.grid.grid:
+            for cell in row:
+                if cell == c.MOUNTAIN_ID:
+                    mountain_count += 1
+        self.energy = (self.grid_size ** 2) + (mountain_count * 5)
+
+        # Store energy for UCS and A*
+        self.search_energy = {}  # { 'UCS': leftover_energy or None, 'A*': leftover_energy or None }
+
         self.perform_searches(player_pos, goal_pos)
 
+    def compute_path_cost(self, path):
+        # path is a list of (x,y)
+        # sum the CELL_COSTS for each cell in path
+        cost = 0
+        for (x, y) in path:
+            cell_id = self.grid.grid[y][x]
+            cost += c.CELL_COSTS.get(cell_id, 1)
+        return cost
+
+    # In the Sidebar draw method, we will show energy only for UCS or A* if available.
+    # Modify the draw method or create a method to show energy when current algorithm is UCS or A*.
+
+    def draw(self, screen: pygame.Surface, valid_map: bool, search_results=None, current_algorithm=None) -> Tuple[
+        List[Rect], Rect, Rect]:
+        font = pygame.font.Font(None, c.PYGAME_FONT)  # Set font for button labels
+        sidebar_rect = pygame.Rect(c.WINDOW_SIZE, 0, c.SIDEBAR_WIDTH, c.WINDOW_SIZE)
+        pygame.draw.rect(screen, c.LIGHT_GREY, sidebar_rect)
+
+        tool_buttons = []
+        current_y = c.SIDEBAR_PADDING
+        for label in c.BUTTON_LABELS:
+            button_rect = pygame.Rect(c.BUTTON_X, current_y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
+            button_color = c.BLACK if self.selected_tool == label.lower() else c.DARK_GREY
+            pygame.draw.rect(screen, button_color, button_rect)
+
+            button_text = font.render(label, True, c.WHITE)
+            text_x = c.BUTTON_X + (c.BUTTON_WIDTH - button_text.get_width()) // 2
+            text_y = current_y + (c.BUTTON_HEIGHT - button_text.get_height()) // 2
+            screen.blit(button_text, (text_x, text_y))
+
+            tool_buttons.append(button_rect)
+            current_y += c.BUTTON_HEIGHT + c.BUTTON_SPACING
+
+        # Draw "Check Map" slider
+        slider_rect = self.draw_slider(screen, font, valid_map)
+        current_y += c.BUTTON_SPACING + c.BUTTON_HEIGHT
+
+        run_button_rect = pygame.Rect(c.BUTTON_X, c.RUN_BUTTON_Y, c.BUTTON_WIDTH, c.BUTTON_HEIGHT)
+        if self.check_map and valid_map:
+            run_button_color = c.BLUE  # Active RUN button color
+            run_button_text_color = c.WHITE
+        else:
+            run_button_color = c.DARK_GREY  # Inactive RUN button color
+            run_button_text_color = c.LIGHT_GREY
+
+        pygame.draw.rect(screen, run_button_color, run_button_rect, border_radius=5)
+        run_button_text = font.render("RUN", True, run_button_text_color)
+        text_x = run_button_rect.x + (c.BUTTON_WIDTH - run_button_text.get_width()) // 2
+        text_y = run_button_rect.y + (c.BUTTON_HEIGHT - run_button_text.get_height()) // 2
+        screen.blit(run_button_text, (text_x, text_y))
+
+        if self.check_map and valid_map:
+            pygame.draw.rect(screen, c.GREEN, run_button_rect, 2, border_radius=5)
+
+        if search_results:
+            result_font = pygame.font.Font(None, c.RESULT_FONT_SIZE)
+            for alg_name, result in search_results.items():
+                # If current_algorithm is UCS or A*, and we are currently displaying that algorithm,
+                # we show energy or "Energy < 0". For BFS/DFS, we show time as before.
+
+                result_text = f"{alg_name}: {result}"
+                result_surface = result_font.render(result_text, True, c.BLACK)
+                text_x = c.BUTTON_X
+                screen.blit(result_surface, (text_x, current_y))
+                current_y += result_surface.get_height() + 5
+
+        current_y += 10
+        if current_algorithm:
+            algorithm_font = pygame.font.Font(None, c.RESULT_FONT_SIZE)
+            algorithm_text = f"Displaying {current_algorithm}"
+            algorithm_surface = algorithm_font.render(algorithm_text, True, c.BLACK)
+            text_x = c.BUTTON_X
+            screen.blit(algorithm_surface, (text_x, current_y))
+            current_y += algorithm_surface.get_height() + 5
+
+            # Instruction to the user
+            instruction_font = pygame.font.Font(None, c.RESULT_FONT_SIZE)
+            instruction_text = "Press SPACE"
+            instruction_surface = instruction_font.render(instruction_text, True, c.BLACK)
+            screen.blit(instruction_surface, (text_x, current_y))
+            current_y += instruction_surface.get_height() + 5
+
+        return tool_buttons, slider_rect, run_button_rect
+
+    # When space is pressed and we cycle through algorithms, after finishing, we must clear energy display.
+    # In the event loop:
+    # After finishing viewing all paths (self.displaying_paths = False), we no longer show energy.
+    # This is already handled since we show energy only while displaying_paths = True and have current_algorithm.
+
+    # Also, when RUN button is clicked again (run_game called again), we recalculate energy and reset search_results
+    # and search_energy.
+    # This will ensure a fresh start each time.
+
     def perform_searches(self, player_pos, goal_pos):
-        # Run BFS and DFS without interacting with the hydra
+        # Run BFS and DFS as before
         bfs_path, bfs_runtime = self.grid.bfs(player_pos, goal_pos)
         dfs_path, dfs_runtime = self.grid.dfs(player_pos, goal_pos)
 
-        # Initialize search results
+        # BFS/DFS store runtime results
         self.search_results = {
             'BFS': f"{bfs_runtime * 1000:.2f} ms" if bfs_runtime is not None else "FAIL",
             'DFS': f"{dfs_runtime * 1000:.2f} ms" if dfs_runtime is not None else "FAIL",
@@ -727,45 +829,66 @@ class Game:
             'A*': None
         }
 
-        # Run UCS and A* with hydra interaction
+        # For UCS and A*, we consider energy and might need to kill the hydra if no path is found.
         for algorithm in ['UCS', 'A*']:
             method_name = self.ALGORITHM_METHOD_MAPPING.get(algorithm)
             if not method_name:
-                print(f"No method mapping found for algorithm: {algorithm}")
                 continue
-
-            # Dynamically get the method from the Grid class
             search_method = getattr(self.grid, method_name, None)
             if not search_method:
-                print(f"Grid class has no method named '{method_name}' for algorithm '{algorithm}'.")
                 continue
 
             path, runtime = search_method(player_pos, goal_pos)
             if path:
-                # Path found without needing to kill the hydra
-                self.search_results[algorithm] = f"{runtime * 1000:.2f} ms"
-                self.search_paths[algorithm] = path
+                # Compute the path cost
+                path_cost = self.compute_path_cost(path)
+                leftover_energy = self.energy - path_cost
+                if leftover_energy >= 0:
+                    # Success: Show leftover energy AND time
+                    self.search_results[algorithm] = f"Energy: {leftover_energy}, Time: {runtime * 1000:.2f} ms"
+                    self.search_paths[algorithm] = path
+                    self.search_energy[algorithm] = leftover_energy
+                else:
+                    # Path found but not enough energy
+                    self.search_results[algorithm] = f"Energy < 0, Time: {runtime * 1000:.2f} ms"
+                    self.search_paths[algorithm] = None
+                    self.search_energy[algorithm] = None
             else:
-                # Attempt to kill the hydra up to 10 times
+                # No path found initially, attempt to kill hydra multiple times
                 print(f"{algorithm} failed to find a path. Attempting to kill the Hydra...")
                 attempts = 0
                 success = False
-                while attempts < 10:  # TODO Change to variable
+                while attempts < 10:
                     killed = self.try_kill_hydra()
                     if killed:
                         print(f"Hydra killed on attempt {attempts + 1}. Re-running {algorithm}...")
+                        # Re-run the search after killing hydra
                         path, runtime = search_method(player_pos, goal_pos)
                         if path:
-                            self.search_results[algorithm] = f"{runtime * 1000:.2f} ms"
-                            self.search_paths[algorithm] = path
+                            path_cost = self.compute_path_cost(path)
+                            leftover_energy = self.energy - path_cost
+                            if leftover_energy >= 0:
+                                self.search_results[
+                                    algorithm] = f"Energy: {leftover_energy}, Time: {runtime * 1000:.2f} ms"
+                                self.search_paths[algorithm] = path
+                                self.search_energy[algorithm] = leftover_energy
+                            else:
+                                self.search_results[algorithm] = f"Energy < 0, Time: {runtime * 1000:.2f} ms"
+                                self.search_paths[algorithm] = None
+                                self.search_energy[algorithm] = None
                             success = True
-                            self.hydra_killed = True  # Flag that hydra was killed
+                            self.hydra_killed = True
+                            break
+                        else:
+                            # Even after killing Hydra, no path was found. This should be rare unless map is blocked.
+                            print("No path found even after Hydra was killed.")
                             break
                     else:
                         print(f"Failed to kill Hydra on attempt {attempts + 1}.")
                     attempts += 1
 
                 if not success:
+                    # Even after attempts, we couldn't kill hydra or find path
                     self.search_results[algorithm] = "FAIL"
                     self.search_paths[algorithm] = None
 
@@ -773,13 +896,12 @@ class Game:
         self.current_algorithm_index = 0
         self.algorithms_list = ['BFS', 'DFS', 'UCS', 'A*']
 
-        # Display the first path
         current_algorithm = self.algorithms_list[self.current_algorithm_index]
         self.grid.display_path(self.search_paths.get(current_algorithm))
 
-        print("Search algorithm runtimes:")
-        for alg, runtime in self.search_results.items():
-            print(f"{alg}: {runtime}")
+        print("Search algorithm results:")
+        for alg, res in self.search_results.items():
+            print(f"{alg}: {res}")
 
     def run_experiments(self, runs=100, grid_size=c.GRID_SIZE):
         # Helper function to generate random internal positions
