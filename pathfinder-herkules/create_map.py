@@ -703,13 +703,8 @@ class Game:
             return
 
         # Compute the initial energy:
-        # energy = grid_size² + (number_of_mountains * 5)
-        mountain_count = 0
-        for row in self.grid.grid:
-            for cell in row:
-                if cell == c.MOUNTAIN_ID:
-                    mountain_count += 1
-        self.energy = (self.grid_size ** 2) + (mountain_count * 5)
+        # energy = grid_size²
+        self.energy = self.grid_size ** 2
 
         # Store energy for UCS and A*
         self.search_energy = {}  # { 'UCS': leftover_energy or None, 'A*': leftover_energy or None }
