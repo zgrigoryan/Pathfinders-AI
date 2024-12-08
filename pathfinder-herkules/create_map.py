@@ -16,6 +16,9 @@ class Grid:
     """
 
     def __init__(self, grid_size: int):
+        self.monster_enabled = None
+        self.hydra_heads = None
+        self.hydra_position = None
         self.grid_size = grid_size
         self.cell_size = c.WINDOW_SIZE // grid_size
         self.grid = [[c.EMPTY_CELL_ID for _ in range(grid_size)] for _ in range(grid_size)]
@@ -563,7 +566,7 @@ class Game:
 
         # Helper function to generate random internal positions
         def random_internal_position(grid_size):
-            return (random.randint(1, grid_size - 2), random.randint(1, grid_size - 2))
+            return random.randint(1, grid_size - 2), random.randint(1, grid_size - 2)
 
         if not experiment:
             # Automatically create map with random player and goal positions if auto_map is True
@@ -747,7 +750,7 @@ class Game:
                 print(f"{algorithm} failed to find a path. Attempting to kill the Hydra...")
                 attempts = 0
                 success = False
-                while attempts < 10: # TODO Change to variable
+                while attempts < 10:  # TODO Change to variable
                     killed = self.try_kill_hydra()
                     if killed:
                         print(f"Hydra killed on attempt {attempts + 1}. Re-running {algorithm}...")
@@ -781,7 +784,7 @@ class Game:
     def run_experiments(self, runs=100, grid_size=c.GRID_SIZE):
         # Helper function to generate random internal positions
         def random_internal_position(gs):
-            return (random.randint(1, gs - 2), random.randint(1, gs - 2))
+            return random.randint(1, gs - 2), random.randint(1, gs - 2)
 
         # Results file
         results_file = "results.csv"
